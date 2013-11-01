@@ -8,17 +8,20 @@ from html2text import html2text
 redmine_base = 'http://redmine.yorba.org'
 
 # TODO: do these change with viewer/server prefs?
-timestamp_re = re.compile(r'\d\d/\d\d/\d\d\d\d \d\d:\d\d (?:a|p)m')
+timestamp_re = re.compile(r'^\d\d/\d\d/\d\d\d\d \d\d:\d\d (?:a|p)m$')
 timestamp_format = '%m/%d/%Y %I:%M %p'
 
 href_ignore_re = re.compile(r'^(?!https?://)')
+
+attachment_url_re = re.compile(r'^(/attachments)/(\d+/.*)$')
+attachment_url_sub = r'\1/download/\2'
 
 def scrape(bug_id):
     """Returns a dictionary of information about the bug"""
 
     def to_s(tag, lower=False):
         s = unicode(tag.string)
-        if s == '-':
+        if s == '-' or s.strip() == '':
             return None
         if lower:
             return s.lower()
@@ -36,6 +39,7 @@ def scrape(bug_id):
     times = author('a', title=timestamp_re)
     attributes = issue('table', 'attributes')[0]
     assignee = attributes('td', 'assigned-to')[0]
+    attachments_div = issue('div', 'attachments')[0]
 
     data = {}
     data['title'] = to_s(issue('div', 'subject')[0].h3)
@@ -49,11 +53,28 @@ def scrape(bug_id):
     data['version'] = to_s(attributes('td', 'fixed-version')[0], True)
     data['description'] = to_text(issue('div', 'wiki')[0])
     data['history'] = to_text(html('div', id='history')[0])
+
+    attachments = []
+    for p in attachments_div('p'):
+        description = to_s(p.a.nextSibling)
+        attachments.append({
+            'filename': to_s(p.a),
+            'description': description.lstrip(' -').strip() if description != None else None,
+            'author': None, # TODO
+            'created': None, # TODO
+            'url': "{0}{1}".format(redmine_base, attachment_url_re.sub(attachment_url_sub, p.a['href']))
+        })
+
+    data['attachments'] = attachments
     return data
 
-def print_data(data):
+def print_data(data, pre=''):
     for item in sorted(data.keys()):
-        print("{0:<12}: {1}".format(item, data[item]))
+        if type(data[item]) is list: # Assume list of dicts
+            for elem in data[item]:
+                print_data(elem, "{0}[]/".format(item))
+        else:
+            print("{0}{1:<12}: {2}".format(pre, item, data[item]))
 
 def main(argv=None):
     if argv is None:
