@@ -8,16 +8,18 @@ from html2text import html2text
 redmine_base = 'http://redmine.yorba.org'
 
 # TODO: do these change with viewer/server prefs?
-timestamp_re = re.compile(r'^\d\d/\d\d/\d\d\d\d \d\d:\d\d (?:a|p)m$')
+timestamp_pattern = r'\d\d/\d\d/\d\d\d\d \d\d:\d\d (?:a|p)m'
+timestamp_re = re.compile('^{0}$'.format(timestamp_pattern))
 timestamp_format = '%m/%d/%Y %I:%M %p'
 
 href_ignore_re = re.compile(r'^(?!https?://)')
 
 attachment_url_re = re.compile(r'^(/attachments)/(\d+/.*)$')
 attachment_url_sub = r'\1/download/\2'
+attachment_author_re = re.compile(r'^(.*?), ({0})$'.format(timestamp_pattern))
 
 def scrape(bug_id):
-    """Returns a dictionary of information about the bug"""
+    """Returns a dictionary of information about a Redmine bug"""
 
     def to_s(tag, lower=False):
         s = unicode(tag.string)
@@ -28,8 +30,10 @@ def scrape(bug_id):
         return s
 
     def to_text(tag):
-        [img.extract() for img in tag('img')]
-        [a.replaceWith(a.string) for a in tag('a', href=href_ignore_re)]
+        for img in tag('img'):
+            img.extract()
+        for a in tag('a', href=href_ignore_re):
+            a.replaceWith(a.string)
         return html2text(unicode(tag)).strip()
 
     url = '{0}/issues/{1}'.format(redmine_base, bug_id)
@@ -57,11 +61,12 @@ def scrape(bug_id):
     attachments = []
     for p in attachments_div('p'):
         description = to_s(p.a.nextSibling)
+        author_match = attachment_author_re.search(to_s(p('span', 'author')[0]))
         attachments.append({
             'filename': to_s(p.a),
             'description': description.lstrip(' -').strip() if description != None else None,
-            'author': None, # TODO
-            'created': None, # TODO
+            'author': author_match.group(1),
+            'created': time.strptime(author_match.group(2), timestamp_format),
             'url': "{0}{1}".format(redmine_base, attachment_url_re.sub(attachment_url_sub, p.a['href']))
         })
 
