@@ -3,7 +3,7 @@
 # redmine2bugzilla - export Redmine bugs to Bugzilla-importable XML
 
 import sys, time, re
-import urllib2, base64
+import urllib2, base64, textwrap
 from BeautifulSoup import BeautifulSoup
 from html2text import html2text
 import argparse
@@ -78,7 +78,7 @@ def scrape(bug_id):
         attachment['description'] = description.lstrip(' -').strip() if description != None else None
         attachment['author'] = author_match.group(1)
         attachment['created'] = time.strptime(author_match.group(2), timestamp_format)
-        attachment['data'] = base64.b64encode(urllib2.urlopen(attachment_url).read())
+        attachment['data'] = textwrap.fill(base64.b64encode(urllib2.urlopen(attachment_url).read()), 76)
         attachments.append(attachment)
 
     data['attachments'] = attachments
