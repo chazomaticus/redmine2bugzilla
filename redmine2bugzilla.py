@@ -10,6 +10,11 @@ import argparse
 
 redmine_base = 'http://redmine.example.com'
 
+bugzilla_default_user = 'bugs@example.com'
+bugzilla_users = {
+    'John Doe': 'john.doe@example.com',
+}
+
 # TODO: do these change with viewer/server prefs?
 timestamp_pattern = r'\d\d/\d\d/\d\d\d\d \d\d:\d\d (?:a|p)m'
 timestamp_re = re.compile('^{0}$'.format(timestamp_pattern))
@@ -94,22 +99,86 @@ def print_data(data, pre=''):
         else:
             print("{0}{1:<12}: {2}".format(pre, item, data[item] if item != 'data' else "{0}...".format(data[item][:48])))
 
+def print_bug_xml(data):
+    """Prints the results of scrape() as a snippet of Bugzilla XML"""
+
+    print("""
+        <bug>
+            <product>{project}</product>
+            <short_desc>{title}</short_desc>
+            <reporter name="{author_name}">{author}</reporter>
+            <assigned_to name="{assignee_name}">{assignee}</assigned_to>
+            <creation_ts>{created}</creation_ts>
+            <delta_ts>{updated}</delta_ts>
+            <bug_status>{status}</bug_status>
+            <priority>{priority}</priority>
+            <component>{category}</component>
+            <version>{version}</version>
+            <long_desc>
+                <who name="{author_name}">{author}</who>
+                <bug_when>{created}</bug_when>
+                <thetext>{description}</thetext>
+            </long_desc>
+            <long_desc>
+                <who name="{meta_author_name}">{meta_author}</who>
+                <bug_when>{meta_updated}</bug_when>
+                <thetext>{meta}</thetext>
+            </long_desc>""".format(
+        # TODO
+    ))
+
+    if data['history'] != None:
+        print("""
+            <long_desc>
+                <who name="{historian_name}">{historian}</who>
+                <bug_when>{updated}</bug_when>
+                <thetext>{history}</thetext>
+            </long_desc>""".format(
+            # TODO
+        ))
+
+    for attachment in data['attachments']:
+        print("""
+            <attachment ispatch="{is_patch}">
+                <filename>{filename}</filename>
+                <desc>{description}</desc>
+                <attacher>{author}</attacher>
+                <date>{created}</date>
+                <data>{data}</data>
+            </attachment>""".format(
+            # TODO
+        ))
+
+    print("""
+        </bug>""")
+
+def redmine2bugzilla(bug_ids):
+    for bug_id in bug_ids if type(bug_ids) is list else [bug_ids]:
+        pass # TODO
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv
 
     global redmine_base
+    global bugzilla_default_user
 
     parser = argparse.ArgumentParser(prog=argv[0],
             description="export Redmine bugs to Bugzilla-importable XML")
     parser.add_argument('-r', '--redmine-base',
             help="Redmine base URL, default: {0}".format(redmine_base))
+    parser.add_argument('-d', '--bugzilla-default-user',
+            help="Bugzilla user when not in lookup table, default: {0}".format(bugzilla_default_user))
+    # TODO: specify other users, too
     parser.add_argument('-s', '--scrape', metavar='BUG_ID', action='append',
             help="don't export; scrape and print data from the bug ids")
     args = parser.parse_args(argv[1:])
 
     if args.redmine_base != None:
         redmine_base = args.redmine_base
+    if args.bugzilla_default_user != None:
+        bugzilla_default_user = args.bugzilla_default_user
+
     if args.scrape != None:
         for bug in args.scrape:
             print("Bug {0}".format(bug))
