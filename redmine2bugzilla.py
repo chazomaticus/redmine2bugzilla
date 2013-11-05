@@ -12,6 +12,7 @@ import argparse
 
 
 redmine_base = 'http://redmine.example.com'
+redmine_timezone_offset = '0000'
 
 searchable_id_formula = 'example-bug-{}'
 
@@ -49,8 +50,7 @@ redmine_attachment_url_re = re.compile(r'^(/attachments)/(\d+/.*)$')
 redmine_attachment_url_sub = r'\1/download/\2'
 redmine_attachment_author_re = re.compile(r'^(.*?), ({0})$'.format(redmine_timestamp_pattern))
 
-# FIXME: %z isn't working on scraped dates
-bugzilla_timestamp_format = '%Y-%m-%d %H:%M:%S %z' # TODO: %z isn't always available.
+bugzilla_timestamp_format = '%Y-%m-%d %H:%M:%S +{}' # {} receives redmine_timezone_offset
 
 
 debug = True
@@ -139,6 +139,9 @@ def print_data(data, pre=''):
                 datum = "{0}...".format(base64.b64encode(datum)[:48])
             print("{0}{1:<12}: {2}".format(pre, item, datum))
 
+def bugzilla_time(t):
+    return time.strftime(bugzilla_timestamp_format.format(redmine_timezone_offset), t)
+
 def xml_user(name):
     if name in bugzilla_users:
         return (bugzilla_users[name], name)
@@ -155,7 +158,7 @@ def bug_xml_fields(data):
 
     fields = {}
     def use(f): fields[f] = E(data[f])
-    def use_date(f): fields[f] = E(time.strftime(bugzilla_timestamp_format, data[f]))
+    def use_date(f): fields[f] = E(bugzilla_time(data[f]))
     use('project')
     use('title')
     fields['author_name'] = A(author_name)
@@ -172,7 +175,7 @@ def bug_xml_fields(data):
     use('description')
     fields['meta_author_name'] = A(no_author_name)
     fields['meta_author'] = E(no_author)
-    fields['meta_updated'] = E(time.strftime(bugzilla_timestamp_format, meta_time))
+    fields['meta_updated'] = E(bugzilla_time(meta_time))
     fields['meta'] = E("""
 Original Redmine bug id: {id}
 Original URL: {url}
@@ -194,7 +197,7 @@ def attachment_xml_fields(attachment):
 
     fields = {}
     def use(f): fields[f] = E(attachment[f])
-    def use_date(f): fields[f] = E(time.strftime(bugzilla_timestamp_format, attachment[f]))
+    def use_date(f): fields[f] = E(bugzilla_time(attachment[f]))
     fields['is_patch'] = A(1 if attachment['type'] == 'text/x-patch' else 0)
     use('filename')
     use('type')
@@ -270,6 +273,7 @@ def main(argv=None):
         argv = sys.argv
 
     global redmine_base
+    global redmine_timezone_offset
     global searchable_id_formula
     global bugzilla_default_user
     global bugzilla_default_user_name
@@ -279,6 +283,8 @@ def main(argv=None):
             description="export Redmine bugs to Bugzilla-importable XML")
     parser.add_argument('--redmine-base',
             help="Redmine base URL, default: {0}".format(redmine_base))
+    parser.add_argument('--redmine-timezone-offset',
+            help="Redmine server timezone offset in HHMM, default: {0}".format(redmine_timezone_offset))
     parser.add_argument('--searchable-id-formula',
             help="pattern ({{}}=old bug id) used for a searchable hash, default: {0}".format(searchable_id_formula))
     parser.add_argument('--bugzilla-default-user',
@@ -293,16 +299,12 @@ def main(argv=None):
     parser.add_argument('-q', '--quiet', action='store_true', help="suppress normal debug output on stderr")
     args = parser.parse_args(argv[1:])
 
-    if args.redmine_base is not None:
-        redmine_base = args.redmine_base
-    if args.searchable_id_formula is not None:
-        searchable_id_formula = args.searchable_id_formula
-    if args.bugzilla_default_user is not None:
-        bugzilla_default_user = args.bugzilla_default_user
-    if args.bugzilla_default_user_name is not None:
-        bugzilla_default_user_name = args.bugzilla_default_user_name
-    if args.quiet:
-        debug = False
+    if args.redmine_base is not None: redmine_base = args.redmine_base
+    if args.redmine_timezone_offset is not None: redmine_timezone_offset = args.redmine_timezone_offset
+    if args.searchable_id_formula is not None: searchable_id_formula = args.searchable_id_formula
+    if args.bugzilla_default_user is not None: bugzilla_default_user = args.bugzilla_default_user
+    if args.bugzilla_default_user_name is not None: bugzilla_default_user_name = args.bugzilla_default_user_name
+    if args.quiet: debug = False
 
     if args.scrape is not None:
         for bug in args.scrape:
