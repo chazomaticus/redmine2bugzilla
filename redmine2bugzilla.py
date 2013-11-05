@@ -79,6 +79,9 @@ def scrape(bug_id):
             img.extract()
         for a in tag('a', href=redmine_href_ignore_re):
             a.replaceWith(a.string)
+        for a in tag('a'):
+            if a.has_key('href') and a['href'] == a.string:
+                a.replaceWith(a.string)
         return html2text(unicode(tag)).strip()
 
     def to_date(s):
