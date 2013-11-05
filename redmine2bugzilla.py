@@ -308,7 +308,7 @@ def main(argv=None):
             help="Bugzilla user when not in lookup table, default: {0}".format(bugzilla_default_user))
     parser.add_argument('--bugzilla-default-user-name',
             help="Bugzilla default user's real name, default: {0}".format(bugzilla_default_user_name))
-    # TODO: specify other users, too
+    # TODO: specify other users, too.
     parser.add_argument('-s', '--scrape', metavar='BUG_ID', action='append',
             help="don't export; scrape and print data from the bug ids")
     parser.add_argument('-e', '--export', metavar='BUG_ID', action='append',
@@ -337,11 +337,13 @@ def main(argv=None):
     id_re = re.compile(r'^\d+$')
 
     exports = [e for e in args.export if id_re.match(e)]
+    # TODO: don't wait for end of input to start the export process.
     if '-' in args.export:
         for line in sys.stdin:
             if id_re.match(line):
                 exports.append(line.strip())
 
+    # TODO: batch these in small groups, output to as many files as it takes.
     redmine2bugzilla(exports, file)
     return 0
 
