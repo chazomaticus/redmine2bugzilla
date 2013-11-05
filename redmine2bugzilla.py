@@ -214,8 +214,11 @@ def attachment_xml_fields(attachment):
     fields['data'] = E(textwrap.fill(base64.b64encode(attachment['data']), 76))
     return fields
 
-def print_bug_xml(data):
+def print_bug_xml(data, file=None):
     """Prints the results of scrape() as a snippet of Bugzilla XML"""
+
+    if file is None:
+        file = sys.stdout
 
     fields = bug_xml_fields(data)
 
@@ -241,7 +244,7 @@ def print_bug_xml(data):
                 <who name={meta_author_name}>{meta_author}</who>
                 <bug_when>{meta_updated}</bug_when>
                 <thetext>{meta}</thetext>
-            </long_desc>""".format(**fields))
+            </long_desc>""".format(**fields), file=file)
 
     if data['history'] is not None:
         print("""
@@ -249,7 +252,7 @@ def print_bug_xml(data):
                 <who name={historian_name}>{historian}</who>
                 <bug_when>{updated}</bug_when>
                 <thetext>{history}</thetext>
-            </long_desc>""".format(**fields))
+            </long_desc>""".format(**fields), file=file)
 
     for attachment in data['attachments']:
         print("""
@@ -260,20 +263,26 @@ def print_bug_xml(data):
                 <attacher>{author}</attacher>
                 <date>{created}</date>
                 <data encoding="base64">{data}</data>
-            </attachment>""".format(**attachment_xml_fields(attachment)))
+            </attachment>""".format(**attachment_xml_fields(attachment)), file=file)
 
     print("""
-        </bug>""")
+        </bug>""", file=file)
 
-def redmine2bugzilla(bug_ids):
-    # TODO: header
+def redmine2bugzilla(bug_ids, file=None):
+    """Exports the given bug ids as Bugzilla-importable XML to the given file or stdout"""
+
+    if file is None:
+        file = sys.stdout
+
+    print("""<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>""", file=file)
+    print("<bugzilla>", file=file)
 
     for bug_id in bug_ids if type(bug_ids) is list else [bug_ids]:
         debug_print("Bug {0}...".format(bug_id))
         data = scrape(bug_id)
-        print_bug_xml(data)
+        print_bug_xml(data, file)
 
-    # TODO: footer
+    print("</bugzilla>", file=file)
 
 def main(argv=None):
     if argv is None:
@@ -285,6 +294,7 @@ def main(argv=None):
     global bugzilla_default_user
     global bugzilla_default_user_name
     global debug
+    file = sys.stdout
 
     parser = argparse.ArgumentParser(prog=argv[0],
             description="export Redmine bugs to Bugzilla-importable XML")
@@ -303,6 +313,8 @@ def main(argv=None):
             help="don't export; scrape and print data from the bug ids")
     parser.add_argument('-e', '--export', metavar='BUG_ID', action='append',
             help="export this bug id (if '-', read bug ids one per line from stdin)")
+    parser.add_argument('-o', '--destination',
+            help="export to this file (if '-', stdout), default: - (stdout)")
     parser.add_argument('-q', '--quiet', action='store_true', help="suppress normal debug output on stderr")
     args = parser.parse_args(argv[1:])
 
@@ -311,6 +323,7 @@ def main(argv=None):
     if args.searchable_id_formula is not None: searchable_id_formula = args.searchable_id_formula
     if args.bugzilla_default_user is not None: bugzilla_default_user = args.bugzilla_default_user
     if args.bugzilla_default_user_name is not None: bugzilla_default_user_name = args.bugzilla_default_user_name
+    if args.destination is not None: file = open(args.destination, 'w') if args.destination != '-' else sys.stdout
     if args.quiet: debug = False
 
     if args.scrape is not None:
@@ -329,7 +342,7 @@ def main(argv=None):
             if id_re.match(line):
                 exports.append(line.strip())
 
-    redmine2bugzilla(exports)
+    redmine2bugzilla(exports, file)
     return 0
 
 if __name__ == '__main__':
