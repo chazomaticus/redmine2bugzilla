@@ -3,7 +3,7 @@
 # redmine2bugzilla - export Redmine bugs to Bugzilla-importable XML
 
 from __future__ import print_function
-import sys, re
+import sys, os, re
 from datetime import datetime, timedelta
 import urllib2, base64, textwrap
 from xml.sax.saxutils import escape as xml_escape, quoteattr as xml_quoteattr
@@ -19,10 +19,8 @@ class Config:
     def __init__(self):
         # In approximate decreasing order of your likelihood to want to edit:
 
+        self.exporter = os.getenv('EMAIL', 'you@example.com')
         self.redmine_base = 'http://redmine.example.com'
-        self.bugzilla_base = 'http://bugzilla.example.com/' # Note difference of trailing slashes.
-
-        self.bugzilla_maintainer = 'bugmaster@example.com'
 
         self.searchable_id_formula = 'example-bug-{}'
 
@@ -32,7 +30,7 @@ class Config:
             'John Doe': 'john.doe@example.com',
         }
 
-        self.bugzilla_version = '4.4.1'
+        self.bugzilla_version = '3.4.13'
 
         self.redmine_timezone = get_localzone()
 
@@ -281,10 +279,9 @@ def print_bug_xml(data, config):
 
 def header_xml_fields(config):
     fields = {}
-    fields['base'] = E(config.bugzilla_base) # This'll never contain a ", right?
-    fields['base_attr'] = A(config.bugzilla_base)
     fields['version'] = A(config.bugzilla_version)
-    fields['maintainer'] = A(config.bugzilla_maintainer)
+    fields['base'] = A(config.redmine_base)
+    fields['exporter'] = A(config.exporter)
     return fields
 
 def redmine2bugzilla(bug_ids, config=None):
@@ -294,11 +291,12 @@ def redmine2bugzilla(bug_ids, config=None):
         config = Config()
 
     print("""<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
-<!DOCTYPE bugzilla SYSTEM "{base}bugzilla.dtd">
+<!DOCTYPE bugzilla SYSTEM "https://bugzilla.mozilla.org/page.cgi?id=bugzilla.dtd">
 <bugzilla
     version={version}
-    urlbase={base_attr}
-    maintainer={maintainer}
+    urlbase={base}
+    exporter={exporter}
+    maintainer=""
 >
     """.format(**header_xml_fields(config)), file=config.file)
 
@@ -323,12 +321,10 @@ def main(argv=None):
             help="export to this file (if '-', stdout), default: - (stdout)")
     parser.add_argument('-s', '--scrape', metavar='BUG_ID', action='append',
             help="don't export; scrape and print data from the bug ids on stdout")
+    parser.add_argument('--exporter',
+            help="Your email address, default: {0}".format(config.exporter))
     parser.add_argument('--redmine-base',
             help="Redmine base URL (no trailing slash), default: {0}".format(config.redmine_base))
-    parser.add_argument('--bugzilla-base',
-            help="Bugzilla base URL (with trailing slash), default: {0}".format(config.bugzilla_base))
-    parser.add_argument('--bugzilla-maintainer',
-            help="Bugzilla maintainer email, default: {0}".format(config.bugzilla_maintainer))
     parser.add_argument('--searchable-id-formula',
             help="pattern ({{}}=old bug id) used for a searchable hash, default: {0}".format(config.searchable_id_formula))
     parser.add_argument('--bugzilla-default-user',
@@ -344,9 +340,8 @@ def main(argv=None):
     args = parser.parse_args(argv[1:])
 
     if args.destination and args.destination != '-': config.file = open(args.destination, 'w')
+    if args.exporter: config.exporter = args.exporter
     if args.redmine_base: config.redmine_base = args.redmine_base
-    if args.bugzilla_base: config.bugzilla_base = args.bugzilla_base
-    if args.bugzilla_maintainer: config.bugzilla_maintainer = args.bugzilla_maintainer
     if args.searchable_id_formula: config.searchable_id_formula = args.searchable_id_formula
     if args.bugzilla_default_user: config.bugzilla_default_user = args.bugzilla_default_user
     if args.bugzilla_default_user_name: config.bugzilla_default_user_name = args.bugzilla_default_user_name
