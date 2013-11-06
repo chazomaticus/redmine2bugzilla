@@ -94,9 +94,10 @@ def scrape(bug_id):
     times = author('a', title=redmine_timestamp_re)
     attributes = issue('table', 'attributes')[0]
     assignee = attributes('td', 'assigned-to')[0]
+    version = attributes('td', 'fixed-version')[0]
+    histories = html('div', id='history')
     attachments_divs = issue('div', 'attachments')
     attachments_div = attachments_divs[0] if attachments_divs else None
-    histories = html('div', id='history')
 
     data = {}
     data['id'] = bug_id
@@ -110,7 +111,7 @@ def scrape(bug_id):
     data['status'] = to_s(attributes('td', 'status')[0], True)
     data['priority'] = to_s(attributes('td', 'priority')[0], True)
     data['category'] = to_s(attributes('td', 'category')[0], True)
-    data['version'] = to_s(attributes('td', 'fixed-version')[0], True) # FIXME: this is wrong
+    data['version'] = to_s(version.a if version.a else version, True)
     data['description'] = to_text(issue('div', 'wiki')[0])
     data['history'] = to_text(histories[0]) if histories else None
 
