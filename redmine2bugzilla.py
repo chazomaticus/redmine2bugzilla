@@ -9,6 +9,7 @@ import urllib2, base64, textwrap
 from xml.sax.saxutils import escape as xml_escape, quoteattr as xml_quoteattr
 import argparse
 from html2text import html2text
+# FIXME: import these under try:, provide a helpful error
 from BeautifulSoup import BeautifulSoup
 from pytz import timezone
 from tzlocal import get_localzone
@@ -338,12 +339,17 @@ def main(argv=None):
 
     id_re = re.compile(r'^\d+$')
 
-    exports = [e for e in args.export if id_re.match(e)]
+    args_export = args.export or []
+    exports = [e for e in args_export if id_re.match(e)]
     # TODO: don't wait for end of input to start the export process.
-    if '-' in args.export:
+    if '-' in args_export:
         for line in sys.stdin:
             if id_re.match(line):
                 exports.append(line.strip())
+
+    if not exports:
+        debug_print("Nothing to export; run with --help for help")
+        return 0
 
     # TODO: batch these in small groups, output to as many files as it takes.
     redmine2bugzilla(exports, file)
