@@ -17,9 +17,12 @@ from tzlocal import get_localzone
 
 class Config:
     def __init__(self):
-        self.redmine_base = 'http://redmine.example.com'
+        # In approximate decreasing order of your likelihood to want to edit:
 
-        self.redmine_timezone = get_localzone()
+        self.redmine_base = 'http://redmine.example.com'
+        self.bugzilla_base = 'http://bugzilla.example.com/' # Note difference of trailing slashes.
+
+        self.bugzilla_maintainer = 'bugmaster@example.com'
 
         self.searchable_id_formula = 'example-bug-{}'
 
@@ -28,6 +31,10 @@ class Config:
         self.bugzilla_users = {
             'John Doe': 'john.doe@example.com',
         }
+
+        self.bugzilla_version = '4.4.1'
+
+        self.redmine_timezone = get_localzone()
 
         self.bugzilla_default_status = 'NEW'
         self.bugzilla_statuses = {
@@ -272,14 +279,28 @@ def print_bug_xml(data, config):
     print("""
         </bug>""", file=config.file)
 
+def header_xml_fields(config):
+    fields = {}
+    fields['base'] = E(config.bugzilla_base) # This'll never contain a ", right?
+    fields['base_attr'] = A(config.bugzilla_base)
+    fields['version'] = A(config.bugzilla_version)
+    fields['maintainer'] = A(config.bugzilla_maintainer)
+    return fields
+
 def redmine2bugzilla(bug_ids, config=None):
     """Exports the given bug ids as Bugzilla-importable XML"""
 
     if config is None:
         config = Config()
 
-    print("""<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>""", file=config.file)
-    print("<bugzilla>", file=config.file)
+    print("""<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<!DOCTYPE bugzilla SYSTEM "{base}bugzilla.dtd">
+<bugzilla
+    version={version}
+    urlbase={base_attr}
+    maintainer={maintainer}
+>
+    """.format(**header_xml_fields(config)), file=config.file)
 
     for bug_id in bug_ids if type(bug_ids) is list else [bug_ids]:
         debug_print("Bug {0}...".format(bug_id), config)
@@ -296,10 +317,18 @@ def main(argv=None):
 
     parser = argparse.ArgumentParser(prog=argv[0],
             description="export Redmine bugs to Bugzilla-importable XML")
+    parser.add_argument('-e', '--export', metavar='BUG_ID', action='append',
+            help="export this bug id (if '-', read bug ids one per line from stdin)")
+    parser.add_argument('-o', '--destination',
+            help="export to this file (if '-', stdout), default: - (stdout)")
+    parser.add_argument('-s', '--scrape', metavar='BUG_ID', action='append',
+            help="don't export; scrape and print data from the bug ids on stdout")
     parser.add_argument('--redmine-base',
-            help="Redmine base URL, default: {0}".format(config.redmine_base))
-    parser.add_argument('--redmine-timezone',
-            help="Redmine server timezone, default: {0}".format(config.redmine_timezone))
+            help="Redmine base URL (no trailing slash), default: {0}".format(config.redmine_base))
+    parser.add_argument('--bugzilla-base',
+            help="Bugzilla base URL (with trailing slash), default: {0}".format(config.bugzilla_base))
+    parser.add_argument('--bugzilla-maintainer',
+            help="Bugzilla maintainer email, default: {0}".format(config.bugzilla_maintainer))
     parser.add_argument('--searchable-id-formula',
             help="pattern ({{}}=old bug id) used for a searchable hash, default: {0}".format(config.searchable_id_formula))
     parser.add_argument('--bugzilla-default-user',
@@ -307,21 +336,22 @@ def main(argv=None):
     parser.add_argument('--bugzilla-default-user-name',
             help="Bugzilla default user's real name, default: {0}".format(config.bugzilla_default_user_name))
     # TODO: specify other users, too.
-    parser.add_argument('-s', '--scrape', metavar='BUG_ID', action='append',
-            help="don't export; scrape and print data from the bug ids")
-    parser.add_argument('-e', '--export', metavar='BUG_ID', action='append',
-            help="export this bug id (if '-', read bug ids one per line from stdin)")
-    parser.add_argument('-o', '--destination',
-            help="export to this file (if '-', stdout), default: - (stdout)")
+    parser.add_argument('--bugzilla-version',
+            help="Bugzilla version number, default: {0}".format(config.bugzilla_version))
+    parser.add_argument('--redmine-timezone',
+            help="Redmine server timezone, default: {0}".format(config.redmine_timezone))
     parser.add_argument('-q', '--quiet', action='store_true', help="suppress normal debug output on stderr")
     args = parser.parse_args(argv[1:])
 
+    if args.destination and args.destination != '-': config.file = open(args.destination, 'w')
     if args.redmine_base: config.redmine_base = args.redmine_base
-    if args.redmine_timezone: config.redmine_timezone = timezone(args.redmine_timezone)
+    if args.bugzilla_base: config.bugzilla_base = args.bugzilla_base
+    if args.bugzilla_maintainer: config.bugzilla_maintainer = args.bugzilla_maintainer
     if args.searchable_id_formula: config.searchable_id_formula = args.searchable_id_formula
     if args.bugzilla_default_user: config.bugzilla_default_user = args.bugzilla_default_user
     if args.bugzilla_default_user_name: config.bugzilla_default_user_name = args.bugzilla_default_user_name
-    if args.destination and args.destination != '-': config.file = open(args.destination, 'w')
+    if args.bugzilla_version: config.bugzilla_version = args.bugzilla_version
+    if args.redmine_timezone: config.redmine_timezone = timezone(args.redmine_timezone)
     if args.quiet: config.debug = False
 
     if args.scrape:
