@@ -66,6 +66,9 @@ def debug_print(s):
 def scrape(bug_id):
     """Returns a dictionary of information about a Redmine bug"""
 
+    def first(tags):
+        return tags[0] if tags and len(tags) > 0 else None
+
     def to_s(tag, lower=False):
         s = unicode(tag.string)
         if s == '-' or s.strip() == '':
@@ -75,6 +78,8 @@ def scrape(bug_id):
         return s
 
     def to_text(tag):
+        if not tag:
+            return None
         for img in tag('img'):
             img.extract()
         for a in tag('a', href=redmine_href_ignore_re):
@@ -89,34 +94,32 @@ def scrape(bug_id):
 
     url = '{0}/issues/{1}'.format(redmine_base, bug_id)
     html = BeautifulSoup(urllib2.urlopen(url).read(), convertEntities=BeautifulSoup.HTML_ENTITIES)
-    issue = html('div', 'issue')[0]
-    author = issue('p', 'author')[0]
+    issue = first(html('div', 'issue'))
+    author = first(issue('p', 'author'))
     times = author('a', title=redmine_timestamp_re)
-    attributes = issue('table', 'attributes')[0]
-    assignee = attributes('td', 'assigned-to')[0]
-    version = attributes('td', 'fixed-version')[0]
-    histories = html('div', id='history')
-    attachments_divs = issue('div', 'attachments')
-    attachments_div = attachments_divs[0] if attachments_divs else None
+    attributes = first(issue('table', 'attributes'))
+    assignee = first(attributes('td', 'assigned-to'))
+    version = first(attributes('td', 'fixed-version'))
+    attachments_div = first(issue('div', 'attachments'))
 
     data = {}
     data['id'] = bug_id
     data['url'] = url
     data['project'] = to_s(html.h1, True)
-    data['title'] = to_s(issue('div', 'subject')[0].h3)
+    data['title'] = to_s(first(issue('div', 'subject')).h3)
     data['author'] = to_s(author.a)
-    data['assignee'] = to_s(assignee.a if assignee.a is not None else assignee)
+    data['assignee'] = to_s(assignee.a if assignee.a else assignee)
     data['created'] = to_date(times[0]['title'])
-    data['updated'] = to_date(times[1]['title'])
-    data['status'] = to_s(attributes('td', 'status')[0], True)
-    data['priority'] = to_s(attributes('td', 'priority')[0], True)
-    data['category'] = to_s(attributes('td', 'category')[0], True)
+    data['updated'] = to_date(times[1]['title']) if len(times) > 1 else None
+    data['status'] = to_s(first(attributes('td', 'status')), True)
+    data['priority'] = to_s(first(attributes('td', 'priority')), True)
+    data['category'] = to_s(first(attributes('td', 'category')), True)
     data['version'] = to_s(version.a if version.a else version, True)
-    data['description'] = to_text(issue('div', 'wiki')[0])
-    data['history'] = to_text(histories[0]) if histories else None
+    data['description'] = to_text(first(issue('div', 'wiki')))
+    data['history'] = to_text(first(html('div', id='history')))
 
     attachments = []
-    for p in attachments_div('p') if attachments_div is not None else []:
+    for p in attachments_div('p') if attachments_div else []:
         description = to_s(p.a.nextSibling)
         author_match = redmine_attachment_author_re.search(to_s(p('span', 'author')[0]))
         attachment_url = "{0}{1}".format(redmine_base,
@@ -128,7 +131,7 @@ def scrape(bug_id):
         attachment['url'] = attachment_url
         attachment['filename'] = to_s(p.a)
         attachment['type'] = handle.info().gettype()
-        attachment['description'] = description.lstrip(' -').strip() if description is not None else None
+        attachment['description'] = description.lstrip(' -').strip() if description else None
         attachment['author'] = author_match.group(1)
         attachment['created'] = to_date(author_match.group(2))
         attachment['data'] = attachment_data
@@ -155,8 +158,8 @@ def xml_user(name):
         return (bugzilla_users[name], name)
     return (bugzilla_default_user, bugzilla_default_user_name)
 
-def E(x): return xml_escape(str(x) if x is not None else '')
-def A(x): return xml_quoteattr(str(x) if x is not None else '')
+def E(x): return xml_escape(str(x) if x else '')
+def A(x): return xml_quoteattr(str(x) if x else '')
 
 def bug_xml_fields(data):
     author, author_name = xml_user(data['author'])
@@ -166,15 +169,14 @@ def bug_xml_fields(data):
 
     fields = {}
     def use(f): fields[f] = E(data[f])
-    def use_date(f): fields[f] = E(data[f].strftime(bugzilla_timestamp_format))
     use('project')
     use('title')
     fields['author_name'] = A(author_name)
     fields['author'] = E(author)
     fields['assignee_name'] = A(assignee_name)
     fields['assignee'] = E(assignee)
-    use_date('created')
-    use_date('updated')
+    fields['created'] = E(data['created'].strftime(bugzilla_timestamp_format))
+    fields['updated'] = E(data['updated'].strftime(bugzilla_timestamp_format) if data['updated'] else None)
     fields['status'] = E(bugzilla_statuses.get(data['status'], bugzilla_default_status))
     fields['resolution'] = E(bugzilla_resolutions.get(data['status'], bugzilla_default_resolution))
     use('priority')
@@ -205,13 +207,12 @@ def attachment_xml_fields(attachment):
 
     fields = {}
     def use(f): fields[f] = E(attachment[f])
-    def use_date(f): fields[f] = E(attachment[f].strftime(bugzilla_timestamp_format))
     fields['is_patch'] = A(1 if attachment['type'] == 'text/x-patch' else 0)
     use('filename')
     use('type')
     use('description')
     fields['author'] = E(author)
-    use_date('created')
+    fields['created'] = E(attachment['created'].strftime(bugzilla_timestamp_format))
     fields['data'] = E(textwrap.fill(base64.b64encode(attachment['data']), 76))
     return fields
 
@@ -247,7 +248,7 @@ def print_bug_xml(data, file=None):
                 <thetext>{meta}</thetext>
             </long_desc>""".format(**fields), file=file)
 
-    if data['history'] is not None:
+    if data['history']:
         print("""
             <long_desc>
                 <who name={historian_name}>{historian}</who>
@@ -319,15 +320,15 @@ def main(argv=None):
     parser.add_argument('-q', '--quiet', action='store_true', help="suppress normal debug output on stderr")
     args = parser.parse_args(argv[1:])
 
-    if args.redmine_base is not None: redmine_base = args.redmine_base
-    if args.redmine_timezone is not None: redmine_timezone = timezone(args.redmine_timezone)
-    if args.searchable_id_formula is not None: searchable_id_formula = args.searchable_id_formula
-    if args.bugzilla_default_user is not None: bugzilla_default_user = args.bugzilla_default_user
-    if args.bugzilla_default_user_name is not None: bugzilla_default_user_name = args.bugzilla_default_user_name
-    if args.destination is not None: file = open(args.destination, 'w') if args.destination != '-' else sys.stdout
+    if args.redmine_base: redmine_base = args.redmine_base
+    if args.redmine_timezone: redmine_timezone = timezone(args.redmine_timezone)
+    if args.searchable_id_formula: searchable_id_formula = args.searchable_id_formula
+    if args.bugzilla_default_user: bugzilla_default_user = args.bugzilla_default_user
+    if args.bugzilla_default_user_name: bugzilla_default_user_name = args.bugzilla_default_user_name
+    if args.destination: file = open(args.destination, 'w') if args.destination != '-' else sys.stdout
     if args.quiet: debug = False
 
-    if args.scrape is not None:
+    if args.scrape:
         for bug in args.scrape:
             print("Bug {0}".format(bug))
             print("----")
