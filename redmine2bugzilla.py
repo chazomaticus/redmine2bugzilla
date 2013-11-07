@@ -355,7 +355,8 @@ def main(argv=None):
     parser.add_argument('-q', '--quiet', action='store_true', help=u"suppress normal debug output on stderr")
     args = parser.parse_args(argv[1:])
 
-    if args.destination and args.destination != '-': config.file = codecs.open(args.destination, 'w', encoding='UTF-8')
+    if args.destination and args.destination != '-':
+        config.file = codecs.open(args.destination, 'w', encoding='UTF-8') # TODO: close this.
     if args.exporter: config.exporter = args.exporter
     if args.redmine_base: config.redmine_base = args.redmine_base
     if args.searchable_id_formula: config.searchable_id_formula = args.searchable_id_formula
