@@ -3,7 +3,7 @@
 # redmine2bugzilla - export Redmine bugs to Bugzilla-importable XML
 
 from __future__ import print_function
-import sys, os, re
+import sys, os, re, codecs
 from datetime import datetime, timedelta
 import urllib2, base64, textwrap
 from xml.sax.saxutils import escape as xml_escape, quoteattr as xml_quoteattr
@@ -136,7 +136,7 @@ def scrape(bug_id, config):
         link = p.a['href']
         description = to_s(p.a.nextSibling)
         author_match = config.redmine_attachment_author_re.search(to_s(p('span', 'author')[0]))
-        attachment_url = "{0}{1}".format(config.redmine_base,
+        attachment_url = '{0}{1}'.format(config.redmine_base,
                 config.redmine_attachment_url_re.sub(config.redmine_attachment_url_sub, link))
         handle = urllib2.urlopen(attachment_url)
         attachment_data = handle.read()
@@ -161,20 +161,20 @@ def print_data(data, pre=''):
     for item in sorted(data.keys()):
         if type(data[item]) is list: # Assume list of dicts
             for elem in data[item]:
-                print_data(elem, "{0}[]/".format(item))
+                print_data(elem, u"{0}[]/".format(item))
         else:
             datum = data[item]
             if item == 'data':
-                datum = "{0}...".format(base64.b64encode(datum)[:48])
-            print("{0}{1:<12}: {2}".format(pre, item, datum))
+                datum = u"{0}...".format(base64.b64encode(datum)[:48])
+            print(u"{0}{1:<12}: {2}".format(pre, item, datum))
 
 def xml_user(name, config):
     if name in config.bugzilla_users:
         return (config.bugzilla_users[name], name)
     return (config.bugzilla_default_user, config.bugzilla_default_user_name)
 
-def E(x): return xml_escape(str(x) if x else '')
-def A(x): return xml_quoteattr(str(x) if x else '')
+def E(x): return xml_escape(unicode(x) if x else '')
+def A(x): return xml_quoteattr(unicode(x) if x else '')
 
 def bug_xml_fields(data, config):
     author, author_name = xml_user(data['author'], config)
@@ -202,7 +202,7 @@ def bug_xml_fields(data, config):
     fields['meta_author_name'] = A(no_author_name)
     fields['meta_author'] = E(no_author)
     fields['meta_updated'] = E(meta_time.strftime(config.bugzilla_timestamp_format))
-    fields['meta'] = E("""
+    fields['meta'] = E(u"""
 Original Redmine bug id: {id}
 Original URL: {url}
 Original author: {author}
@@ -238,7 +238,7 @@ def print_bug_xml(data, config):
 
     fields = bug_xml_fields(data, config)
 
-    print("""
+    print(u"""
         <bug>
             <bug_id>{id}</bug_id>
             <product>{project}</product>
@@ -268,7 +268,7 @@ def print_bug_xml(data, config):
             </long_desc>""".format(**fields), file=config.file)
 
     if data['history']:
-        print("""
+        print(u"""
             <long_desc>
                 <who name={historian_name}>{historian}</who>
                 <bug_when>{updated}</bug_when>
@@ -276,7 +276,7 @@ def print_bug_xml(data, config):
             </long_desc>""".format(**fields), file=config.file)
 
     for attachment in data['attachments']:
-        print("""
+        print(u"""
             <attachment ispatch={is_patch}>
                 <attachid>{id}</attachid>
                 <filename>{filename}</filename>
@@ -287,13 +287,13 @@ def print_bug_xml(data, config):
                 <data encoding="base64">{data}</data>
             </attachment>""".format(**attachment_xml_fields(attachment, config)), file=config.file)
 
-    print("""
+    print(u"""
         </bug>""", file=config.file)
 
 def header_xml_fields(config):
     fields = {}
     fields['version'] = A(config.bugzilla_version)
-    fields['base'] = A("{0}/".format(config.redmine_base))
+    fields['base'] = A('{0}/'.format(config.redmine_base))
     fields['exporter'] = A(config.exporter)
     fields['maintainer'] = A(config.bugzilla_maintainer)
     return fields
@@ -304,7 +304,7 @@ def redmine2bugzilla(bug_ids, config=None):
     if config is None:
         config = Config()
 
-    print("""<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+    print(u"""<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <!DOCTYPE bugzilla SYSTEM "https://bugzilla.mozilla.org/page.cgi?id=bugzilla.dtd">
 <bugzilla
     version={version}
@@ -315,11 +315,11 @@ def redmine2bugzilla(bug_ids, config=None):
     """.format(**header_xml_fields(config)), file=config.file)
 
     for bug_id in bug_ids if type(bug_ids) is list else [bug_ids]:
-        debug_print("Bug {0}...".format(bug_id), config)
+        debug_print(u"Bug {0}...".format(bug_id), config)
         data = scrape(bug_id, config)
         print_bug_xml(data, config)
 
-    print("</bugzilla>", file=config.file)
+    print(u"</bugzilla>", file=config.file)
 
 def main(argv=None):
     if argv is None:
@@ -328,34 +328,34 @@ def main(argv=None):
     config = Config()
 
     parser = argparse.ArgumentParser(prog=argv[0],
-            description="export Redmine bugs to Bugzilla-importable XML")
+            description=u"export Redmine bugs to Bugzilla-importable XML")
     parser.add_argument('-e', '--export', metavar='BUG_ID', action='append',
-            help="export this bug id (if '-', read bug ids one per line from stdin)")
+            help=u"export this bug id (if '-', read bug ids one per line from stdin)")
     parser.add_argument('-o', '--destination',
-            help="export to this file (if '-', stdout), default: - (stdout)")
+            help=u"export to this file (if '-', stdout), default: - (stdout)")
     parser.add_argument('-s', '--scrape', metavar='BUG_ID', action='append',
-            help="don't export; scrape and print data from the bug ids on stdout")
+            help=u"don't export; scrape and print data from the bug ids on stdout")
     parser.add_argument('--exporter',
-            help="Your email address, default: {0}".format(config.exporter))
+            help=u"Your email address, default: {0}".format(config.exporter))
     parser.add_argument('--redmine-base',
-            help="Redmine base URL (no trailing slash), default: {0}".format(config.redmine_base))
+            help=u"Redmine base URL (no trailing slash), default: {0}".format(config.redmine_base))
     parser.add_argument('--searchable-id-formula',
-            help="pattern ({{}}=old bug id) used for a searchable hash, default: {0}".format(config.searchable_id_formula))
+            help=u"pattern ({{}}=old bug id) used for a searchable hash, default: {0}".format(config.searchable_id_formula))
     parser.add_argument('--bugzilla-default-user',
-            help="Bugzilla user when not in lookup table, default: {0}".format(config.bugzilla_default_user))
+            help=u"Bugzilla user when not in lookup table, default: {0}".format(config.bugzilla_default_user))
     parser.add_argument('--bugzilla-default-user-name',
-            help="Bugzilla default user's real name, default: {0}".format(config.bugzilla_default_user_name))
+            help=u"Bugzilla default user's real name, default: {0}".format(config.bugzilla_default_user_name))
     # TODO: specify other users, too.
     parser.add_argument('--bugzilla-maintainer',
-            help="Bugzilla maintainer email, default: {0}".format(config.bugzilla_maintainer))
+            help=u"Bugzilla maintainer email, default: {0}".format(config.bugzilla_maintainer))
     parser.add_argument('--bugzilla-version',
-            help="Bugzilla version number, default: {0}".format(config.bugzilla_version))
+            help=u"Bugzilla version number, default: {0}".format(config.bugzilla_version))
     parser.add_argument('--redmine-timezone',
-            help="Redmine server timezone, default: {0}".format(config.redmine_timezone))
-    parser.add_argument('-q', '--quiet', action='store_true', help="suppress normal debug output on stderr")
+            help=u"Redmine server timezone, default: {0}".format(config.redmine_timezone))
+    parser.add_argument('-q', '--quiet', action='store_true', help=u"suppress normal debug output on stderr")
     args = parser.parse_args(argv[1:])
 
-    if args.destination and args.destination != '-': config.file = open(args.destination, 'w')
+    if args.destination and args.destination != '-': config.file = codecs.open(args.destination, 'w', encoding='UTF-8')
     if args.exporter: config.exporter = args.exporter
     if args.redmine_base: config.redmine_base = args.redmine_base
     if args.searchable_id_formula: config.searchable_id_formula = args.searchable_id_formula
@@ -368,10 +368,10 @@ def main(argv=None):
 
     if args.scrape:
         for bug in args.scrape:
-            print("Bug {0}".format(bug))
-            print("----")
+            print(u"Bug {0}".format(bug))
+            print(u"----")
             print_data(scrape(bug, config))
-            print("")
+            print(u"")
         return 0
 
     id_re = re.compile(r'^\d+$')
@@ -385,7 +385,7 @@ def main(argv=None):
                 exports.append(line.strip())
 
     if not exports:
-        debug_print("Nothing to export; run with --help for help", config)
+        debug_print(u"Nothing to export; run with --help for help", config)
         return 0
 
     # TODO: batch these in small groups, output to as many files as it takes.
