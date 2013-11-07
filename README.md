@@ -5,7 +5,7 @@ redmine2bugzilla is a simple script to export Redmine bugs to an XML format
 compatible with Bugzilla's [importxml.pl][0] script.  It works by scraping
 public Redmine HTML for data, and converting that into a format readable by
 Bugzilla.  It was tested extensively by exporting bugs from a Redmine 1.3.3
-install into [GNOME's Bugzilla][https://bugzilla.gnome.org/], running version
+install into [GNOME's Bugzilla](https://bugzilla.gnome.org/), running version
 3.4.13.  I can't vouch for any other combination of installations.
 
 Dependencies
@@ -98,7 +98,9 @@ of the tags are obvious, but some aren't.
   database.
 * `urlbase` should be set to the base URL of the bug database being exported.
   It gets concatenated with `show_bug.cgi?id=` and the bug's `bug_id` tag in
-  some text describing where the bug came from.
+  some text describing where the bug came from.  This is wrong for Redmine.  Oh
+  well.  (It looks like in more modern versions of Bugzilla, the `importxml.pl`
+  script accepts a `--bug_page` argument that can fix this.)
 * `maintainer` and `exporter` should be set to the email addresses for the
   maintainer of the bug database being exported and your email address,
   respectively.  `importxml.pl` can send these addresses a summary of the
@@ -106,15 +108,15 @@ of the tags are obvious, but some aren't.
 
 `bug` tag children:
 * `bug_id` should be set to the id of the bug being exported, whatever it is.
-  Bugzilla uses this to make up a URL for the original bug.  It'll be wrong for
-  Redmine.  Oh well.  (It looks like in more modern versions of Bugzilla, the
-  `importxml.pl` script accepts a `--bug_page` argument that can fix this.)
+  See `urlbase` above.
 * Attachments need to have a non-empty `attachid` tag.  It seems to be ignored,
   and can be `x`.  It just won't import the attachment without it set.
 * The `encoding` attribute on attachments' `data` tag can have the value
   `filename`, in which case `importxml.pl` will open the specified file.  This
-  requires the `--attach_path` argument.  This script instead includes
-  attachments inline, base64-encoded.
+  requires the `--attach_path` argument.  I might be mistaken, but
+  `encoding="filename"` appears to be a violation of the
+  [DTD](https://bugzilla.mozilla.org/page.cgi?id=bugzilla.dtd).  This script
+  instead includes attachments inline, base64-encoded, so it's not an issue.
 
 Everything else seemed fairly straightforward to me.
 
