@@ -9,7 +9,7 @@ import urllib2, base64, textwrap
 from xml.sax.saxutils import escape as xml_escape, quoteattr as xml_quoteattr
 import argparse
 from html2text import html2text
-# FIXME: import these under try:, provide a helpful error
+# TODO: import these under try:, provide a helpful error.
 from BeautifulSoup import BeautifulSoup
 from pytz import timezone
 from tzlocal import get_localzone
@@ -27,9 +27,11 @@ class Config:
         self.bugzilla_default_user = 'bugs@example.com'
         self.bugzilla_default_user_name = 'Maintainers'
         self.bugzilla_users = {
-            'John Doe': 'john.doe@example.com',
+            # 'Redmine Name': 'bugzilla-account-name',
+            # e.g.: 'John Doe': 'john.doe@example.com',
         }
 
+        self.bugzilla_maintainer = 'bugzilla@example.com'
         self.bugzilla_version = '3.4.13'
 
         self.redmine_timezone = get_localzone()
@@ -44,7 +46,7 @@ class Config:
             'invalid': 'RESOLVED',
         }
 
-        self.bugzilla_default_resolution = ''
+        self.bugzilla_default_resolution = None
         self.bugzilla_resolutions = {
             'fixed': 'FIXED',
             'duplicate': 'DUPLICATE',
@@ -58,8 +60,9 @@ class Config:
 
         self.redmine_href_ignore_re = re.compile(r'^(?!https?://)')
 
-        self.redmine_attachment_url_re = re.compile(r'^(/attachments)/(\d+/.*)$')
+        self.redmine_attachment_url_re = re.compile(r'^(/attachments)/((\d+)/.*)$')
         self.redmine_attachment_url_sub = r'\1/download/\2'
+        self.redmine_attachment_id_sub = r'\3'
         self.redmine_attachment_author_re = re.compile(r'^(.*?), ({0})$'.format(self.redmine_timestamp_pattern))
 
         self.bugzilla_timestamp_format = '%Y-%m-%d %H:%M:%S %z'
@@ -130,14 +133,16 @@ def scrape(bug_id, config):
 
     attachments = []
     for p in attachments_div('p') if attachments_div else []:
+        link = p.a['href']
         description = to_s(p.a.nextSibling)
         author_match = config.redmine_attachment_author_re.search(to_s(p('span', 'author')[0]))
         attachment_url = "{0}{1}".format(config.redmine_base,
-                config.redmine_attachment_url_re.sub(config.redmine_attachment_url_sub, p.a['href']))
+                config.redmine_attachment_url_re.sub(config.redmine_attachment_url_sub, link))
         handle = urllib2.urlopen(attachment_url)
         attachment_data = handle.read()
 
         attachment = {}
+        attachment['id'] = config.redmine_attachment_url_re.sub(config.redmine_attachment_id_sub, link)
         attachment['url'] = attachment_url
         attachment['filename'] = to_s(p.a)
         attachment['type'] = handle.info().gettype()
@@ -179,6 +184,7 @@ def bug_xml_fields(data, config):
 
     fields = {}
     def use(f): fields[f] = E(data[f])
+    use('id')
     use('project')
     use('title')
     fields['author_name'] = A(author_name)
@@ -217,10 +223,11 @@ def attachment_xml_fields(attachment, config):
 
     fields = {}
     def use(f): fields[f] = E(attachment[f])
-    fields['is_patch'] = A(1 if attachment['type'] == 'text/x-patch' else 0)
+    use('id')
+    fields['is_patch'] = A('1' if attachment['type'] == 'text/x-patch' else '0')
     use('filename')
     use('type')
-    use('description')
+    fields['description'] = E(attachment['description'] if attachment['description'] else attachment['filename'])
     fields['author'] = E(author)
     fields['created'] = E(attachment['created'].strftime(config.bugzilla_timestamp_format))
     fields['data'] = E(textwrap.fill(base64.b64encode(attachment['data']), 76))
@@ -233,6 +240,7 @@ def print_bug_xml(data, config):
 
     print("""
         <bug>
+            <bug_id>{id}</bug_id>
             <product>{project}</product>
             <short_desc>{title}</short_desc>
             <reporter name={author_name}>{author}</reporter>
@@ -242,8 +250,12 @@ def print_bug_xml(data, config):
             <bug_status>{status}</bug_status>
             <resolution>{resolution}</resolution>
             <priority>{priority}</priority>
+            <bug_severity>normal</bug_severity>
             <component>{category}</component>
             <version>{version}</version>
+            <rep_platform>All</rep_platform>
+            <op_sys>All</op_sys>
+            <actual_time>0</actual_time>
             <long_desc>
                 <who name={author_name}>{author}</who>
                 <bug_when>{created}</bug_when>
@@ -266,6 +278,7 @@ def print_bug_xml(data, config):
     for attachment in data['attachments']:
         print("""
             <attachment ispatch={is_patch}>
+                <attachid>{id}</attachid>
                 <filename>{filename}</filename>
                 <type>{type}</type>
                 <desc>{description}</desc>
@@ -280,8 +293,9 @@ def print_bug_xml(data, config):
 def header_xml_fields(config):
     fields = {}
     fields['version'] = A(config.bugzilla_version)
-    fields['base'] = A(config.redmine_base)
+    fields['base'] = A("{0}/".format(config.redmine_base))
     fields['exporter'] = A(config.exporter)
+    fields['maintainer'] = A(config.bugzilla_maintainer)
     return fields
 
 def redmine2bugzilla(bug_ids, config=None):
@@ -296,7 +310,7 @@ def redmine2bugzilla(bug_ids, config=None):
     version={version}
     urlbase={base}
     exporter={exporter}
-    maintainer=""
+    maintainer={maintainer}
 >
     """.format(**header_xml_fields(config)), file=config.file)
 
@@ -332,6 +346,8 @@ def main(argv=None):
     parser.add_argument('--bugzilla-default-user-name',
             help="Bugzilla default user's real name, default: {0}".format(config.bugzilla_default_user_name))
     # TODO: specify other users, too.
+    parser.add_argument('--bugzilla-maintainer',
+            help="Bugzilla maintainer email, default: {0}".format(config.bugzilla_maintainer))
     parser.add_argument('--bugzilla-version',
             help="Bugzilla version number, default: {0}".format(config.bugzilla_version))
     parser.add_argument('--redmine-timezone',
@@ -345,6 +361,7 @@ def main(argv=None):
     if args.searchable_id_formula: config.searchable_id_formula = args.searchable_id_formula
     if args.bugzilla_default_user: config.bugzilla_default_user = args.bugzilla_default_user
     if args.bugzilla_default_user_name: config.bugzilla_default_user_name = args.bugzilla_default_user_name
+    if args.bugzilla_maintainer: config.bugzilla_maintainer = args.bugzilla_maintainer
     if args.bugzilla_version: config.bugzilla_version = args.bugzilla_version
     if args.redmine_timezone: config.redmine_timezone = timezone(args.redmine_timezone)
     if args.quiet: config.debug = False
