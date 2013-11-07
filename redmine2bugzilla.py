@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import urllib2, base64, textwrap
 from xml.sax.saxutils import escape as xml_escape, quoteattr as xml_quoteattr
 import argparse
-from html2text import html2text
 # TODO: import these under try:, provide a helpful error.
 from BeautifulSoup import BeautifulSoup
+from html2text import html2text
 from pytz import timezone
 from tzlocal import get_localzone
 
