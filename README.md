@@ -95,7 +95,7 @@ of the tags are obvious, but some aren't.
 
 `bugzilla` tag attributes:
 * `version` gets checked against the version of the destination Bugzilla
-  database.
+  database.  It doesn't seem like the XML format has changed in years, though.
 * `urlbase` should be set to the base URL of the bug database being exported.
   It gets concatenated with `show_bug.cgi?id=` and the bug's `bug_id` tag in
   some text describing where the bug came from.  This is wrong for Redmine.  Oh
