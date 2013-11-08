@@ -120,6 +120,20 @@ def scrape(bug_id, config):
     def to_date(s):
         return config.redmine_timezone.localize(datetime.strptime(s, config.redmine_timestamp_format))
 
+    def to_relation(tag):
+        if not tag:
+            return None
+        table = first(tag('table', 'list issues'))
+        if not table:
+            return None
+        relations = []
+        for tr in table('tr'):
+            relations.append(u"{0} ({1})".format(
+                    to_text(first(tr('td', 'subject'))),
+                    to_s(first(tr('td', 'status')))
+            ))
+        return u"\n".join(relations)
+
     url = '{0}/issues/{1}'.format(config.redmine_base, bug_id)
     debug_print(u"Scraping {0}...".format(url), config)
 
@@ -146,6 +160,8 @@ def scrape(bug_id, config):
     data['category'] = to_s(first(attributes('td', 'category')))
     data['version'] = to_s(version.a if version.a else version)
     data['description'] = to_text(first(issue('div', 'wiki')))
+    # TODO: subtasks.
+    data['relations'] = to_relation(first(issue('div', id='relations')))
     data['history'] = to_text(first(html('div', id='history')))
 
     attachments = []
@@ -214,7 +230,8 @@ def bug_xml_fields(data, config):
     use('priority')
     use('category')
     use('version')
-    fields['description'] = E(u"""
+    description = []
+    description.append(u"""
 Original Redmine bug id: {id}
 Original URL: {url}
 Searchable id: {hash}
@@ -229,6 +246,12 @@ Original description:
             author=data['author'],
             description=data['description']
     ).strip())
+    if data['relations']:
+        description.append(u"""
+Related issues:
+{relations}
+        """.format(relations=data['relations']).strip())
+    fields['description'] = E(u"\n\n".join(description))
     fields['historian_name'] = A(no_author_name)
     fields['historian'] = E(no_author)
     use('history')
