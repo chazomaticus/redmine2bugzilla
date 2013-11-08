@@ -197,7 +197,6 @@ def bug_xml_fields(data, config):
     author, author_name = xml_user(data['author'], config)
     assignee, assignee_name = xml_user(data['assignee'], config)
     no_author, no_author_name = xml_user(None, config)
-    meta_time = data['created'] + timedelta(seconds=1)
 
     fields = {}
     def use(f): fields[f] = E(data[f])
@@ -215,20 +214,20 @@ def bug_xml_fields(data, config):
     use('priority')
     use('category')
     use('version')
-    use('description')
-    fields['meta_author_name'] = A(no_author_name)
-    fields['meta_author'] = E(no_author)
-    fields['meta_updated'] = E(meta_time.strftime(config.bugzilla_timestamp_format))
-    fields['meta'] = E(u"""
+    fields['description'] = E(u"""
 Original Redmine bug id: {id}
 Original URL: {url}
-Original author: {author}
 Searchable id: {hash}
+Original author: {author}
+Original description:
+
+{description}
     """.format(
             id=data['id'],
             url=data['url'],
+            hash=config.searchable_id_formula.format(data['id']),
             author=data['author'],
-            hash=config.searchable_id_formula.format(data['id'])
+            description=data['description']
     ).strip())
     fields['historian_name'] = A(no_author_name)
     fields['historian'] = E(no_author)
@@ -277,11 +276,6 @@ def print_bug_xml(data, config):
                 <who name={author_name}>{author}</who>
                 <bug_when>{created}</bug_when>
                 <thetext>{description}</thetext>
-            </long_desc>
-            <long_desc>
-                <who name={meta_author_name}>{meta_author}</who>
-                <bug_when>{meta_updated}</bug_when>
-                <thetext>{meta}</thetext>
             </long_desc>""".format(**fields), file=config.file)
 
     if data['history']:
