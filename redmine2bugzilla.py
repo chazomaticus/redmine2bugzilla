@@ -36,7 +36,7 @@ class Config:
         self.exporter = os.getenv('EMAIL', 'you@example.com')
         self.redmine_base = 'http://redmine.example.com'
 
-        self.searchable_id_formula = 'example-bug-{}'
+        self.searchable_id_formula = 'example-bug-{0}'
 
         self.bugzilla_default_user = 'bugs@example.com'
         self.bugzilla_default_user_name = 'Maintainers'
@@ -72,6 +72,7 @@ class Config:
         self.redmine_timestamp_re = re.compile(r'^{0}$'.format(self.redmine_timestamp_pattern))
         self.redmine_timestamp_format = '%m/%d/%Y %I:%M %p'
 
+        self.redmine_issue_class_re = re.compile(r'^issue\b')
         self.redmine_href_ignore_re = re.compile(r'^(?!https?://)')
 
         self.redmine_attachment_url_re = re.compile(r'^(/attachments)/((\d+)/.*)$')
@@ -120,8 +121,10 @@ def scrape(bug_id, config):
         return config.redmine_timezone.localize(datetime.strptime(s, config.redmine_timestamp_format))
 
     url = '{0}/issues/{1}'.format(config.redmine_base, bug_id)
+    debug_print(u"Scraping {0}...".format(url), config)
+
     html = BeautifulSoup(urllib2.urlopen(url).read(), convertEntities=BeautifulSoup.HTML_ENTITIES)
-    issue = first(html('div', 'issue'))
+    issue = first(html('div', attrs={'class': config.redmine_issue_class_re})) # Odd syntax necessary for old BS3
     author = first(issue('p', 'author'))
     times = author('a', title=config.redmine_timestamp_re)
     attributes = first(issue('table', 'attributes'))
@@ -329,7 +332,6 @@ def redmine2bugzilla(bug_ids, config=None):
     """.format(**header_xml_fields(config)), file=config.file)
 
     for bug_id in bug_ids if type(bug_ids) is list else [bug_ids]:
-        debug_print(u"Bug {0}...".format(bug_id), config)
         data = scrape(bug_id, config)
         print_bug_xml(data, config)
 
@@ -354,7 +356,7 @@ def main(argv=None):
     parser.add_argument('--redmine-base',
             help=u"Redmine base URL (no trailing slash), default: {0}".format(config.redmine_base))
     parser.add_argument('--searchable-id-formula',
-            help=u"pattern ({{}}=old bug id) used for a searchable hash, default: {0}".format(config.searchable_id_formula))
+            help=u"pattern ({{0}}=old bug id) used for a searchable hash, default: {0}".format(config.searchable_id_formula))
     parser.add_argument('--bugzilla-default-user',
             help=u"Bugzilla user when not in lookup table, default: {0}".format(config.bugzilla_default_user))
     parser.add_argument('--bugzilla-default-user-name',

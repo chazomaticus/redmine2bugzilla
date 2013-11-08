@@ -11,6 +11,7 @@ install into [GNOME's Bugzilla](https://bugzilla.gnome.org/), running version
 Dependencies
 ------------
 
+* Python 2.6 or 2.7?  Something relatively modern, but not _too_ modern.
 * [Beautiful Soup](http://www.crummy.com/software/BeautifulSoup/)
 * [html2text](https://pypi.python.org/pypi/html2text)
 * [pytz](https://pypi.python.org/pypi/pytz)
@@ -20,6 +21,10 @@ In Ubuntu, these commands will give you the right packages:
 
     $ sudo apt-get install python-beautifulsoup python-pip
     $ sudo pip install html2text pytz tzlocal
+
+If you're in a _really_ old Ubuntu, you might also need:
+
+    $ sudo apt-get install python-argparse
 
 Usage
 -----
