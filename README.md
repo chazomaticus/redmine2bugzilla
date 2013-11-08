@@ -12,7 +12,7 @@ Dependencies
 ------------
 
 * Python 2.6 or 2.7?  Something relatively modern, but not _too_ modern.
-* [Beautiful Soup](http://www.crummy.com/software/BeautifulSoup/)
+* [Beautiful Soup 3](http://www.crummy.com/software/BeautifulSoup/)
 * [html2text](https://pypi.python.org/pypi/html2text)
 * [pytz](https://pypi.python.org/pypi/pytz)
 * [tzlocal](https://pypi.python.org/pypi/tzlocal)
@@ -106,10 +106,12 @@ of the tags are obvious, but some aren't.
   some text describing where the bug came from.  This is wrong for Redmine.  Oh
   well.  (It looks like in more modern versions of Bugzilla, the `importxml.pl`
   script accepts a `--bug_page` argument that can fix this.)
-* `maintainer` and `exporter` should be set to the email addresses for the
-  maintainer of the bug database being exported and your email address,
-  respectively.  `importxml.pl` can send these addresses a summary of the
-  import process.  It won't import without these attributes set.
+* `maintainer` should be set to an email addresses of an administrator of the
+  exported bug database.  `importxml.pl` can send this address a summary of the
+  import process, and won't import without it set.
+* `exporter` should be set to a valid user in the destination Bugzilla.
+  `importxml.pl` can also send this address a summary of the import process,
+  and again won't import without it set and valid.
 
 `bug` tag children:
 * `bug_id` should be set to the id of the bug being exported, whatever it is.
