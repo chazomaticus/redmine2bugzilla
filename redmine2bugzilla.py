@@ -84,7 +84,7 @@ class Config:
 
         self.debug = True
 
-        self.file = sys.stdout
+        self.file = codecs.getwriter('UTF-8')(sys.stdout)
 
 
 def debug_print(s, config):
