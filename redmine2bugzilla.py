@@ -98,7 +98,7 @@ def scrape(bug_id, config):
         return tags[0] if tags and len(tags) > 0 else None
 
     def to_s(tag, lower=False):
-        s = unicode(tag.string)
+        s = unicode(BeautifulSoup(tag.string, convertEntities=BeautifulSoup.HTML_ENTITIES).contents[0])
         if s == '-' or s.strip() == '':
             return None
         if lower:
@@ -123,7 +123,7 @@ def scrape(bug_id, config):
     url = '{0}/issues/{1}'.format(config.redmine_base, bug_id)
     debug_print(u"Scraping {0}...".format(url), config)
 
-    html = BeautifulSoup(urllib2.urlopen(url).read(), convertEntities=BeautifulSoup.HTML_ENTITIES)
+    html = BeautifulSoup(urllib2.urlopen(url).read())
     issue = first(html('div', attrs={'class': config.redmine_issue_class_re})) # Odd syntax necessary for old BS3
     author = first(issue('p', 'author'))
     times = author('a', title=config.redmine_timestamp_re)
