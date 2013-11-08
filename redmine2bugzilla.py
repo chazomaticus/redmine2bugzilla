@@ -52,19 +52,21 @@ class Config:
 
         self.bugzilla_default_status = 'NEW'
         self.bugzilla_statuses = {
-            'need information': 'NEEDINFO',
-            'review': 'ASSIGNED',
-            'blocked': 'VERIFIED',
-            'fixed': 'RESOLVED',
-            'duplicate': 'RESOLVED',
-            'invalid': 'RESOLVED',
+            # 'Redmine Status': 'BUGZILLA-STATUS',
+            'Need Information': 'NEEDINFO',
+            'Review': 'ASSIGNED',
+            'Blocked': 'VERIFIED',
+            'Fixed': 'RESOLVED',
+            'Duplicate': 'RESOLVED',
+            'Invalid': 'RESOLVED',
         }
 
         self.bugzilla_default_resolution = None
         self.bugzilla_resolutions = {
-            'fixed': 'FIXED',
-            'duplicate': 'DUPLICATE',
-            'invalid': 'INVALID',
+            # 'Redmine Status': 'BUGZILLA-RESOLUTION',
+            'Fixed': 'FIXED',
+            'Duplicate': 'DUPLICATE',
+            'Invalid': 'INVALID',
         }
 
         # TODO: do these change with viewer/Redmine server prefs?
@@ -97,12 +99,10 @@ def scrape(bug_id, config):
     def first(tags):
         return tags[0] if tags and len(tags) > 0 else None
 
-    def to_s(tag, lower=False):
+    def to_s(tag):
         s = unicode(BeautifulSoup(tag.string, convertEntities=BeautifulSoup.HTML_ENTITIES).contents[0])
         if s == '-' or s.strip() == '':
             return None
-        if lower:
-            return s.lower()
         return s
 
     def to_text(tag):
@@ -135,16 +135,16 @@ def scrape(bug_id, config):
     data = {}
     data['id'] = bug_id
     data['url'] = url
-    data['project'] = to_s(html.h1, True)
+    data['project'] = to_s(html.h1)
     data['title'] = to_s(first(issue('div', 'subject')).h3)
     data['author'] = to_s(author.a)
     data['assignee'] = to_s(assignee.a if assignee.a else assignee)
     data['created'] = to_date(times[0]['title'])
     data['updated'] = to_date(times[1]['title']) if len(times) > 1 else None
-    data['status'] = to_s(first(attributes('td', 'status')), True)
-    data['priority'] = to_s(first(attributes('td', 'priority')), True)
-    data['category'] = to_s(first(attributes('td', 'category')), True)
-    data['version'] = to_s(version.a if version.a else version, True)
+    data['status'] = to_s(first(attributes('td', 'status')))
+    data['priority'] = to_s(first(attributes('td', 'priority')))
+    data['category'] = to_s(first(attributes('td', 'category')))
+    data['version'] = to_s(version.a if version.a else version)
     data['description'] = to_text(first(issue('div', 'wiki')))
     data['history'] = to_text(first(html('div', id='history')))
 
