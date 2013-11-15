@@ -269,8 +269,11 @@ def attachment_xml_fields(attachment, config):
     fields['description'] = E(attachment['description'] if attachment['description'] else attachment['filename'])
     fields['author'] = E(author)
     fields['created'] = E(attachment['created'].strftime(config.bugzilla_timestamp_format))
-    fields['data'] = E(textwrap.fill(base64.b64encode(attachment['data']), 76))
     return fields
+
+def print_attachment_xml_data(attachment, config):
+    for line in textwrap.wrap(base64.b64encode(attachment['data']), 76, break_on_hyphens=False):
+        print(E(line), file=config.file)
 
 def print_bug_xml(data, config):
     """Prints the results of scrape() as a snippet of Bugzilla XML"""
@@ -318,8 +321,10 @@ def print_bug_xml(data, config):
                 <desc>{description}</desc>
                 <attacher>{author}</attacher>
                 <date>{created}</date>
-                <data encoding="base64">{data}</data>
-            </attachment>""".format(**attachment_xml_fields(attachment, config)), file=config.file)
+                <data encoding="base64">""".format(**attachment_xml_fields(attachment, config)), file=config.file)
+        print_attachment_xml_data(attachment, config)
+        print(u"""</data>
+            </attachment>""", file=config.file)
 
     print(u"""
         </bug>""", file=config.file)
