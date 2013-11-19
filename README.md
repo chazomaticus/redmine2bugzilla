@@ -90,6 +90,13 @@ API:
   could find, especially because scraping makes it easy to control what data is
   being converted.
 
+Please be warned that the mapping isn't 1:1 for all fields.  Because there's no
+way of knowing which Redmine members also have Bugzilla accounts, maintaining
+any specific user information is tricky.  Also, I didn't bother with fields
+like % Done, Due date, or Keywords, because we aren't using them.  As I said
+before, try out the import in a test environment and make sure everything you
+care about is coming through.
+
 XML Format
 ----------
 
