@@ -84,6 +84,10 @@ class Config:
 
         self.bugzilla_timestamp_format = '%Y-%m-%d %H:%M:%S %z'
 
+        # TODO: strip other "autolinkification" mishaps the import script bungles.
+        self.bugzilla_avoid_link_re = re.compile(r'\bbug\s+#?([0-9]+)\b', re.IGNORECASE)
+        self.bugzilla_avoid_link_sub = r'\1'
+
         self.debug = True
 
         self.file = codecs.getwriter('UTF-8')(sys.stdout)
@@ -218,6 +222,9 @@ def E(x): return xml_escape(unicode(x) if x else '')
 def A(x): return xml_quoteattr(unicode(x) if x else '')
 
 def bug_xml_fields(data, config):
+    def delinkify(s):
+        return config.bugzilla_avoid_link_re.sub(config.bugzilla_avoid_link_sub, s)
+
     author, author_name = xml_user(data['author'], config)
     assignee, assignee_name = xml_user(data['assignee'], config)
     no_author, no_author_name = xml_user(None, config)
@@ -252,17 +259,17 @@ Original description:
             url=data['url'],
             hash=config.searchable_id_formula.format(data['id']),
             author=data['author'],
-            description=data['description']
+            description=delinkify(data['description'])
     ).strip())
     if data['relations']:
         description.append(u"""
 Related issues:
 {relations}
-        """.format(relations=data['relations']).strip())
+        """.format(relations=delinkify(data['relations'])).strip())
     fields['description'] = E(u"\n\n".join(description))
     fields['historian_name'] = A(no_author_name)
     fields['historian'] = E(no_author)
-    use('history')
+    fields['history'] = E(delinkify(data['history']))
     watchers = []
     for w in data['watchers']:
         watcher_user, _ = xml_user(w['watcher'], config)
