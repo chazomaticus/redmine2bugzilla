@@ -144,6 +144,7 @@ def scrape(bug_id, config):
     attributes = first(issue('table', 'attributes'))
     assignee = first(attributes('td', 'assigned-to'))
     version = first(attributes('td', 'fixed-version'))
+    watchers_div = first(html('div', id='watchers'))
     attachments_div = first(issue('div', 'attachments'))
 
     data = {}
@@ -163,6 +164,12 @@ def scrape(bug_id, config):
     # TODO: subtasks.
     data['relations'] = to_relation(first(issue('div', id='relations')))
     data['history'] = to_text(first(html('div', id='history')))
+
+    watchers = []
+    for li in watchers_div('li') if watchers_div else []:
+        watcher = {}
+        watcher['watcher'] = to_s(li.a)
+        watchers.append(watcher)
 
     attachments = []
     for p in attachments_div('p') if attachments_div else []:
@@ -185,6 +192,7 @@ def scrape(bug_id, config):
         attachment['data'] = attachment_data
         attachments.append(attachment)
 
+    data['watchers'] = watchers
     data['attachments'] = attachments
     return data
 
@@ -255,6 +263,12 @@ Related issues:
     fields['historian_name'] = A(no_author_name)
     fields['historian'] = E(no_author)
     use('history')
+    watchers = []
+    for w in data['watchers']:
+        watcher_user, _ = xml_user(w['watcher'], config)
+        if watcher_user != config.bugzilla_default_user: # Only include real people
+            watchers.append(E(watcher_user))
+    fields['watchers'] = watchers
     return fields
 
 def attachment_xml_fields(attachment, config):
@@ -297,7 +311,13 @@ def print_bug_xml(data, config):
             <version>{version}</version>
             <rep_platform>All</rep_platform>
             <op_sys>All</op_sys>
-            <actual_time>0</actual_time>
+            <actual_time>0</actual_time>""".format(**fields), file=config.file)
+
+    for watcher in fields['watchers']:
+        print(u"""
+            <cc>{watcher}</cc>""".format(watcher=watcher), file=config.file)
+
+    print(u"""
             <long_desc>
                 <who name={author_name}>{author}</who>
                 <bug_when>{created}</bug_when>
