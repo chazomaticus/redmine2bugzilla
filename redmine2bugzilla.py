@@ -115,7 +115,8 @@ def scrape(bug_id, config):
         for img in tag('img'):
             img.extract()
         for a in tag('a', href=config.redmine_href_ignore_re):
-            a.replaceWith(a.string)
+            if a.string:
+                a.replaceWith(a.string)
         for a in tag('a'):
             if a.has_key('href') and a['href'] == a.string:
                 a.replaceWith(a.string)
@@ -223,7 +224,9 @@ def A(x): return xml_quoteattr(unicode(x) if x else '')
 
 def bug_xml_fields(data, config):
     def delinkify(s):
-        return config.bugzilla_avoid_link_re.sub(config.bugzilla_avoid_link_sub, s)
+        if s:
+            return config.bugzilla_avoid_link_re.sub(config.bugzilla_avoid_link_sub, s)
+        return None
 
     author, author_name = xml_user(data['author'], config)
     assignee, assignee_name = xml_user(data['assignee'], config)
