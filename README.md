@@ -97,6 +97,15 @@ like % Done, Due date, or Keywords, because we aren't using them.  As I said
 before, try out the import in a test environment and make sure everything you
 care about is coming through.
 
+Bugs
+----
+
+* The Target version field in Redmine comes out as the Version field in
+  Bugzilla.  It should instead be mapped to the Target Milestone field.  Fixing
+  this should be easy, but I haven't bothered because our import was already
+  done by the time I figured this out, and I didn't want to go through the
+  trouble of testing any changes.
+
 XML Format
 ----------
 
